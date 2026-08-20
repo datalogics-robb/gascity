@@ -120,10 +120,11 @@ var (
 	controllerStatusStandaloneFallbackTimeout = 250 * time.Millisecond
 	// statusObservationTimeout is the wall-clock backstop for one agent
 	// observation. Observing a running session costs three uncached runtime
-	// round-trips — liveness, attachment, last activity — so the budget is
-	// sized in statusProbeLoadedRoundTrip units and must stay above
-	// statusProviderCallTimeout for the per-call bound to mean anything.
-	statusObservationTimeout     = 4 * statusProbeLoadedRoundTrip
+	// round-trips — liveness, attachment, last activity — of which only the
+	// first is served by the provider's state cache, so the budget must clear
+	// one exhausted statusProviderCallTimeout and stay above it for the
+	// per-call bound to mean anything.
+	statusObservationTimeout     = statusProbeRuntimeBudget + 2*statusProbeTimeoutSlack
 	statusSessionSnapshotTimeout = 3 * time.Second
 )
 

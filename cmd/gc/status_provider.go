@@ -11,22 +11,28 @@ import (
 	"github.com/gastownhall/gascity/internal/runtime"
 )
 
-// statusProbeLoadedRoundTrip is the cost of one runtime status round-trip on a
-// busy host: a fork/exec out of the gc binary plus the provider's own state
-// read. Measured at 70-450ms for the tmux bulk list-panes across gc status and
-// gc doctor runs. Every status deadline is expressed as a multiple of it so a
-// healthy-but-loaded runtime is never reported as unresponsive.
-const statusProbeLoadedRoundTrip = 500 * time.Millisecond
+// statusProbeRuntimeBudget is how long a runtime provider may take answering a
+// status read before gc status stops waiting on it. It mirrors the provider's
+// own state-fetch budget (fetchTimeout in internal/runtime/tmux). A status
+// deadline under the provider's budget cannot tell a provider that is still
+// working from a wedged one, so it turns "slow but correct" into a zero
+// observation that reads as not-running and skews the agent tally. The real
+// cost — a fork/exec plus one bulk state read — scales with host load, so every
+// status deadline follows the provider's contract, not a measured latency.
+const statusProbeRuntimeBudget = 3 * time.Second
+
+// statusProbeTimeoutSlack separates each status deadline from the one below it,
+// so an inner layer that is merely at its limit gets to answer before the outer
+// layer abandons it and substitutes a zero observation.
+const statusProbeTimeoutSlack = 500 * time.Millisecond
 
 var (
-	// statusProviderCallTimeout bounds one runtime status probe. A probe pays a
-	// full runtime round-trip, which for a subprocess-backed provider is a
-	// fork/exec out of the gc binary plus the provider's own state read; that
-	// costs statusProbeLoadedRoundTrip on a busy host, so a bound below it
-	// reports a healthy runtime as unresponsive on every invocation. It stays
-	// below statusObservationTimeout, which remains the wall-clock backstop for
-	// a whole observation.
-	statusProviderCallTimeout    = 2 * statusProbeLoadedRoundTrip
+	// statusProviderCallTimeout bounds one runtime status probe. It sits just
+	// above statusProbeRuntimeBudget so the provider's own timeout fires first
+	// and gets to answer with last-known-good state; this bound is the last
+	// resort that returns a zero observation, and it stays below
+	// statusObservationTimeout, the wall-clock backstop for a whole observation.
+	statusProviderCallTimeout    = statusProbeRuntimeBudget + statusProbeTimeoutSlack
 	statusProviderTimeoutWarning = func() {
 		fmt.Fprintln(os.Stderr, "gc status: runtime status probe timed out; using partial status")
 	}

@@ -99,24 +99,12 @@ func TestStatusProviderTimeoutMarksPartial(t *testing.T) {
 	}
 }
 
-func TestStatusProbeBoundsClearALoadedRuntimeRoundTrip(t *testing.T) {
-	tests := []struct {
-		name  string
-		bound time.Duration
-	}{
-		{name: "statusProviderCallTimeout", bound: statusProviderCallTimeout},
-		{name: "statusObservationTimeout", bound: statusObservationTimeout},
+func TestStatusProbeDeadlinesNestOutwardFromTheRuntimeBudget(t *testing.T) {
+	if statusProviderCallTimeout <= statusProbeRuntimeBudget {
+		t.Errorf("statusProviderCallTimeout = %s, want above statusProbeRuntimeBudget = %s; a bound at or under the provider's own state-read budget turns a slow-but-working provider into a zero observation that reads as not-running", statusProviderCallTimeout, statusProbeRuntimeBudget)
 	}
-	for _, tc := range tests {
-		if tc.bound <= statusProbeLoadedRoundTrip {
-			t.Errorf("%s = %s, want above statusProbeLoadedRoundTrip = %s; a bound at or below one loaded round-trip reports a healthy runtime as unresponsive", tc.name, tc.bound, statusProbeLoadedRoundTrip)
-		}
-	}
-}
-
-func TestStatusProbeBoundStaysUnderObservationTimeout(t *testing.T) {
-	if statusProviderCallTimeout >= statusObservationTimeout {
-		t.Fatalf("statusProviderCallTimeout = %s, want below statusObservationTimeout = %s so the per-observation bound stays the wall-clock backstop", statusProviderCallTimeout, statusObservationTimeout)
+	if statusObservationTimeout <= statusProviderCallTimeout {
+		t.Errorf("statusObservationTimeout = %s, want above statusProviderCallTimeout = %s so the per-call bound can fire before the observation is abandoned", statusObservationTimeout, statusProviderCallTimeout)
 	}
 }
 
