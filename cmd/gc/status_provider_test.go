@@ -99,33 +99,41 @@ func TestStatusProviderTimeoutMarksPartial(t *testing.T) {
 	}
 }
 
-// statusProbeRuntimeRoundTrip is the cost a single status probe must be allowed
-// to absorb: one runtime round-trip that forks a subprocess. A tmux list-panes
-// spawned from the gc binary measures 70-85ms on macOS, so the bound has to
-// clear that comfortably or a healthy runtime reads as unresponsive on every
-// invocation.
-const statusProbeRuntimeRoundTrip = 100 * time.Millisecond
-
-func TestStatusProbeBoundAbsorbsRuntimeRoundTrip(t *testing.T) {
-	origWarn := statusProviderTimeoutWarning
-	t.Cleanup(func() { statusProviderTimeoutWarning = origWarn })
-	statusProviderTimeoutWarning = func() {}
-
-	base := newStatusProbeProvider()
-	base.running.Store(true)
-	base.delay.Store(int64(statusProbeRuntimeRoundTrip))
-	wrapped := newBoundedStatusProvider(base)
-
-	if !wrapped.IsRunning("worker") {
-		t.Fatalf("IsRunning returned false for a live session answering in %s; statusProviderCallTimeout = %s is below one runtime round-trip", statusProbeRuntimeRoundTrip, statusProviderCallTimeout)
+func TestStatusProbeBoundsClearALoadedRuntimeRoundTrip(t *testing.T) {
+	tests := []struct {
+		name  string
+		bound time.Duration
+	}{
+		{name: "statusProviderCallTimeout", bound: statusProviderCallTimeout},
+		{name: "statusObservationTimeout", bound: statusObservationTimeout},
 	}
-	if statusProviderPartial(wrapped) {
-		t.Fatalf("statusProviderPartial = true after a %s probe; statusProviderCallTimeout = %s marks a healthy runtime partial", statusProbeRuntimeRoundTrip, statusProviderCallTimeout)
+	for _, tc := range tests {
+		if tc.bound <= statusProbeLoadedRoundTrip {
+			t.Errorf("%s = %s, want above statusProbeLoadedRoundTrip = %s; a bound at or below one loaded round-trip reports a healthy runtime as unresponsive", tc.name, tc.bound, statusProbeLoadedRoundTrip)
+		}
 	}
 }
 
 func TestStatusProbeBoundStaysUnderObservationTimeout(t *testing.T) {
 	if statusProviderCallTimeout >= statusObservationTimeout {
 		t.Fatalf("statusProviderCallTimeout = %s, want below statusObservationTimeout = %s so the per-observation bound stays the wall-clock backstop", statusProviderCallTimeout, statusObservationTimeout)
+	}
+}
+
+func TestStatusProbeDoesNotMarkPartialForASlowHealthyRuntime(t *testing.T) {
+	origWarn := statusProviderTimeoutWarning
+	t.Cleanup(func() { statusProviderTimeoutWarning = origWarn })
+	statusProviderTimeoutWarning = func() {}
+
+	base := newStatusProbeProvider()
+	base.running.Store(true)
+	base.delay.Store(int64(100 * time.Millisecond))
+	wrapped := newBoundedStatusProvider(base)
+
+	if !wrapped.IsRunning("worker") {
+		t.Fatalf("IsRunning returned false for a live session answering in 100ms; statusProviderCallTimeout = %s is below one runtime round-trip", statusProviderCallTimeout)
+	}
+	if statusProviderPartial(wrapped) {
+		t.Fatalf("statusProviderPartial = true after a 100ms probe; statusProviderCallTimeout = %s marks a healthy runtime partial", statusProviderCallTimeout)
 	}
 }

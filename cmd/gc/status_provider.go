@@ -11,14 +11,22 @@ import (
 	"github.com/gastownhall/gascity/internal/runtime"
 )
 
+// statusProbeLoadedRoundTrip is the cost of one runtime status round-trip on a
+// busy host: a fork/exec out of the gc binary plus the provider's own state
+// read. Measured at 70-450ms for the tmux bulk list-panes across gc status and
+// gc doctor runs. Every status deadline is expressed as a multiple of it so a
+// healthy-but-loaded runtime is never reported as unresponsive.
+const statusProbeLoadedRoundTrip = 500 * time.Millisecond
+
 var (
 	// statusProviderCallTimeout bounds one runtime status probe. A probe pays a
 	// full runtime round-trip, which for a subprocess-backed provider is a
-	// fork/exec plus the provider's own bulk state read, so the bound must
-	// clear a process spawn or a healthy runtime reads as unresponsive. It
-	// stays below statusObservationTimeout, which remains the wall-clock
-	// backstop for a whole observation.
-	statusProviderCallTimeout    = 500 * time.Millisecond
+	// fork/exec out of the gc binary plus the provider's own state read; that
+	// costs statusProbeLoadedRoundTrip on a busy host, so a bound below it
+	// reports a healthy runtime as unresponsive on every invocation. It stays
+	// below statusObservationTimeout, which remains the wall-clock backstop for
+	// a whole observation.
+	statusProviderCallTimeout    = 2 * statusProbeLoadedRoundTrip
 	statusProviderTimeoutWarning = func() {
 		fmt.Fprintln(os.Stderr, "gc status: runtime status probe timed out; using partial status")
 	}

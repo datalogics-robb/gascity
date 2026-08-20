@@ -39,6 +39,7 @@ order-firing-current
 codex-hooks-drift
 rig-pack-coverage
 pack-runtimes
+status-runtime-probe
 mcp-config
 mcp-shared-target
 builtin-pack-imports

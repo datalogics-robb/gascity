@@ -118,8 +118,13 @@ var (
 
 var (
 	controllerStatusStandaloneFallbackTimeout = 250 * time.Millisecond
-	statusObservationTimeout                  = 750 * time.Millisecond
-	statusSessionSnapshotTimeout              = 3 * time.Second
+	// statusObservationTimeout is the wall-clock backstop for one agent
+	// observation. Observing a running session costs three uncached runtime
+	// round-trips — liveness, attachment, last activity — so the budget is
+	// sized in statusProbeLoadedRoundTrip units and must stay above
+	// statusProviderCallTimeout for the per-call bound to mean anything.
+	statusObservationTimeout     = 4 * statusProbeLoadedRoundTrip
+	statusSessionSnapshotTimeout = 3 * time.Second
 )
 
 // newStatusCmd creates the "gc status [path]" command.
