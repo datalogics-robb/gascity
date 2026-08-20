@@ -51,6 +51,7 @@ jq-binary
 pgrep-binary
 lsof-binary
 beads-role
+diagnostic-bounder
 controller
 supervisor-http-api
 agent-sessions

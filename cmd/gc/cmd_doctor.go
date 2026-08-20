@@ -254,6 +254,11 @@ func buildDoctorChecks(cityPath string, cfg *config.City, cfgErr error, opts bui
 	// that will all fail for the same root cause.
 	if initNeedsBdTooling(cityPath) {
 		register(&doctor.BeadsRoleCheck{})
+		// gc init refuses to proceed without a command bounder, but an
+		// already-initialized town never re-runs that gate. Bounded
+		// diagnostics are a bd/Dolt data-plane concern, so this check
+		// rides the same condition.
+		register(newDiagnosticBounderCheck())
 	}
 
 	// Controller check + supervisor HTTP check + session checks (gated by controller state).

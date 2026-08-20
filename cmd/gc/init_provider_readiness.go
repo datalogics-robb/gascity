@@ -623,7 +623,7 @@ func checkHardDependencies(cityPath string) []missingDep {
 			installHint: "install GNU coreutils timeout/gtimeout or python3",
 			condition:   func() bool { return needsBd },
 			available: func() bool {
-				return initAnyToolAvailable("timeout", "gtimeout", "python3")
+				return initAnyToolAvailable(initDiagnosticBounders...)
 			},
 		},
 		{
@@ -816,13 +816,30 @@ func printDoltAuthorIdentityBlock(stderr io.Writer, commandName string, status d
 	fmt.Fprintf(stderr, "%s: resolve the Dolt identity probe error, then run 'gc start'\n", commandName) //nolint:errcheck // best-effort stderr
 }
 
-func initAnyToolAvailable(names ...string) bool {
+// initBounderPython3 is the last-resort bounder: it satisfies run_bounded,
+// but not a literal `timeout ...` command line.
+const initBounderPython3 = "python3"
+
+// initDiagnosticBounders are the command bounders a bounded diagnostic can run
+// under, in the preference order run_bounded itself uses (the dolt pack's
+// assets/scripts/runtime.sh). Every consumer probes this one list so init
+// readiness and gc doctor can never disagree about what counts as a bounder.
+var initDiagnosticBounders = []string{"gtimeout", "timeout", initBounderPython3}
+
+// initFirstToolAvailable returns the first of names that resolves on PATH,
+// and whether any did.
+func initFirstToolAvailable(names ...string) (string, bool) {
 	for _, name := range names {
 		if _, err := initLookPath(name); err == nil {
-			return true
+			return name, true
 		}
 	}
-	return false
+	return "", false
+}
+
+func initAnyToolAvailable(names ...string) bool {
+	_, ok := initFirstToolAvailable(names...)
+	return ok
 }
 
 func initNeedsBdTooling(cityPath string) bool {

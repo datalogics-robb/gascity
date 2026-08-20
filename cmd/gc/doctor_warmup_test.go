@@ -10,6 +10,7 @@ import (
 func TestCommandDoctorChecksWarmupEligibleDefaultsFalse(t *testing.T) {
 	checks := []doctor.Check{
 		&codexHooksDriftCheck{},
+		&diagnosticBounderCheck{},
 		&doltDriftCheck{},
 		&doltTopologyCheck{},
 		&importStateDoctorCheck{},
