@@ -12,7 +12,13 @@ import (
 )
 
 var (
-	statusProviderCallTimeout    = 50 * time.Millisecond
+	// statusProviderCallTimeout bounds one runtime status probe. A probe pays a
+	// full runtime round-trip, which for a subprocess-backed provider is a
+	// fork/exec plus the provider's own bulk state read, so the bound must
+	// clear a process spawn or a healthy runtime reads as unresponsive. It
+	// stays below statusObservationTimeout, which remains the wall-clock
+	// backstop for a whole observation.
+	statusProviderCallTimeout    = 500 * time.Millisecond
 	statusProviderTimeoutWarning = func() {
 		fmt.Fprintln(os.Stderr, "gc status: runtime status probe timed out; using partial status")
 	}
